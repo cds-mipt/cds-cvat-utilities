@@ -38,7 +38,11 @@ class CvatDataset:
                 polygon.attrib["occluded"] = bool(int(polygon.attrib["occluded"]))
                 points = list(map(lambda x: list(map(float, x.split(","))),
                                   polygon.attrib["points"].split(";")))
-                self.add_polygon(image_id, points, polygon.attrib["label"], polygon.attrib["occluded"])
+                conf = None
+                conf_attr = polygon.find("attribute[@name='conf']")
+                if conf_attr is not None:
+                    conf = float(conf_attr.text)
+                self.add_polygon(image_id, points, polygon.attrib["label"], polygon.attrib["occluded"], conf)
 
             if "width" in image.attrib and "height" in image.attrib:
                 self.set_size(image_id, int(image.attrib["width"]), int(image.attrib["height"]))
@@ -93,13 +97,20 @@ class CvatDataset:
                     attr_node.text = str(box['conf'])
 
             for polygon in image["polygons"]:
-                xml.SubElement(
+                polygon_node = xml.SubElement(
                     image_elem,
                     "polygon",
                     occluded=str(int(polygon["occluded"])),
                     points=";".join(["{},{}".format(*point) for point in polygon["points"]]),
                     label=polygon["label"]
                 )
+                if polygon['conf'] is not None:
+                    attr_node = xml.SubElement(
+                        polygon,
+                        "attribute",
+                        name='conf'
+                    )
+                    attr_node.text = str(polygon['conf'])
 
         tree = xml.ElementTree(root)
         with open(path, "w") as f:
@@ -124,9 +135,9 @@ class CvatDataset:
             "xtl": xtl, "ytl": ytl, "xbr": xbr, "ybr": ybr, "label": label, "conf": conf, "occluded": occluded
         })
 
-    def add_polygon(self, image_id, points, label, occluded=False):
+    def add_polygon(self, image_id, points, label, occluded=False, conf=None):
         self._images[image_id]["polygons"].append({
-            "points": points, "label": label, "occluded": occluded
+            "points": points, "label": label, "occluded": occluded, "conf": conf
         })
 
     def get_boxes(self, image_id):
