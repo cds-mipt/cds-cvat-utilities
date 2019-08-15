@@ -1,12 +1,9 @@
 import argparse
-import os
 import numpy as np
 
-from tempfile import NamedTemporaryFile
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 
-from markup import VisionMarkup
 
 np.warnings.filterwarnings("ignore")
 
@@ -21,10 +18,6 @@ class Params:
         # пустой - использовать все
         self.imgIds = []
 
-        # список id классов для подсчета метрик
-        # пустой - использовать все
-        self.classes = ["bus", "car"]
-
         # пороги IoU
         self.iouThrs = np.array([0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95])
 
@@ -37,7 +30,9 @@ class Params:
         }
 
         # остальное, как правило, нет причин менять
-        self.catIds = [gt.object_label_ids[cls] for cls in self.classes]
+        self.id_to_class = {cat_id: cat["name"] for cat_id, cat in gt.cats.items()}
+        self.id_to_class[-1] = "all"
+        self.catIds = list(gt.cats.keys())
         self.useCats = 1
         self.iouType = iouType
         self.useSegm = None
@@ -50,82 +45,61 @@ class Params:
 def build_parser():
     parser = argparse.ArgumentParser("Instance segmentation and object detection metrics")
     parser.add_argument("--gt", type=str, required=True)
-    parser.add_argument("--gt-format", type=str, default="cvat")
-    parser.add_argument("--rt", type=str, required=True)
-    parser.add_argument("--rt-format", type=str, default="cvat")
+    parser.add_argument("--dt", type=str, required=True)
     parser.add_argument("--iou-type", type=str, default="segm", choices=["bbox", "segm"])
     parser.add_argument("--result", type=str, default="result.txt")
     return parser
 
 
 def summarize(gt, coco_eval):
-    def calk_cond_mean(s, area, cls="all", iouThr="mean"):
+    def calk_cond_mean(s, area, cat_id=-1, iouThr="mean"):
         p = coco_eval.params
         s = s[:, :, list(p.areaRngLbl).index(area), -1]
-        if cls != "all":
-            s = s[:, p.catIds.index(gt.object_label_ids[cls])]
+        if cat_id != -1:
+            s = s[:, p.catIds.index(cat_id)]
         if iouThr != "mean":
             s = s[list(p.iouThrs).index(iouThr)]
         valid = s > -1
         return np.mean(s[valid]) if valid.any() else -1
 
-    def AP(area, cls="all", iouThr=None):
+    def AP(area, cat_id=-1, iouThr=None):
         s = coco_eval.eval['precision'].mean(axis=1)
-        return calk_cond_mean(s, area, cls, iouThr)
+        return calk_cond_mean(s, area, cat_id, iouThr)
 
-    def AR(area, cls="all", iouThr=None):
+    def AR(area, cat_id=-1, iouThr=None):
         s = coco_eval.eval['recall']
-        return calk_cond_mean(s, area, cls, iouThr)
+        return calk_cond_mean(s, area, cat_id, iouThr)
 
     msg = "[class = {:>10s} | area = {:6s} | IoU = {:<9}]\tAP = {:0.3f}\tAR = {:0.3f}"
 
     stats = []
     p = coco_eval.params
-    for cls in ["all"] + p.classes:
+    for cat_id in [-1] + p.catIds:
         for area in p.areaRngLbl:
             for iouThr in ["mean"] + list(p.iouThrs):
-                ap = AP(area, cls, iouThr)
-                ar = AR(area, cls, iouThr)
-                print(msg.format(cls, area, iouThr, ap, ar))
+                ap = AP(area, cat_id, iouThr)
+                ar = AR(area, cat_id, iouThr)
+                print(msg.format(p.id_to_class[cat_id], area, iouThr, ap, ar))
 
     coco_eval.stats = np.array(stats)
 
 
 def main(args):
-    coco_gt_file = NamedTemporaryFile("w", delete=False)
-    coco_gt_file.close()
-    gt = VisionMarkup()
-    gt.load_cvat(args.gt)
+    coco_gt = COCO(args.gt)
+    coco_dt = coco_gt.loadRes(args.dt)
 
-    coco_rt_file = NamedTemporaryFile("w", delete=False)
-    coco_rt_file.close()
-    rt = VisionMarkup()
-    rt.load_cvat(args.rt)
-
-    # в фаиле с результатом классы могли быть перечислины в другом порядке или отсутствовать
-    rt.object_label_ids = gt.object_label_ids
-
-    gt.dump_coco(coco_gt_file.name, "gt")
-    rt.dump_coco(coco_rt_file.name, "rt")
-
-    coco_gt = COCO(coco_gt_file.name)
-    coco_rt = coco_gt.loadRes(coco_rt_file.name)
-
-    params = Params(gt=gt, iouType=args.iou_type)
+    params = Params(coco_gt, iouType=args.iou_type)
     if not params.imgIds:
         params.imgIds = sorted(coco_gt.getImgIds())
     if not params.catIds:
         params.catIds = sorted(coco_gt.getCatIds())
 
-    coco_eval = COCOeval(coco_gt, coco_rt, args.iou_type)
+    coco_eval = COCOeval(coco_gt, coco_dt, args.iou_type)
     coco_eval.params = params
     coco_eval.evaluate()
     coco_eval.accumulate()
 
-    summarize(gt, coco_eval)
-
-    os.remove(coco_gt_file.name)
-    os.remove(coco_rt_file.name)
+    summarize(coco_gt, coco_eval)
 
 
 if __name__ == "__main__":
