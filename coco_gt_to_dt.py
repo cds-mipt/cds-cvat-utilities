@@ -3,6 +3,7 @@ import json
 import pycocotools.mask as mask_utils
 
 from pycocotools.coco import COCO
+from tqdm import tqdm
 
 
 def build_parser():
@@ -18,7 +19,7 @@ def main(args):
     coco_gt = COCO(args.coco_gt)
 
     coco_dt_lst = []
-    for ann in coco_gt.anns.values():
+    for ann in tqdm(coco_gt.anns.values()):
         annotation = {
             "image_id": ann["image_id"],
             "category_id": ann["category_id"],

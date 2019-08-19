@@ -106,7 +106,7 @@ class CvatDataset:
                 )
                 if polygon['conf'] is not None:
                     attr_node = xml.SubElement(
-                        polygon,
+                        polygon_node,
                         "attribute",
                         name='conf'
                     )

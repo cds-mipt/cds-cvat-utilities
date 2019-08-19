@@ -1,48 +1,41 @@
 import argparse
 import pycocotools.mask as mask_utils
-import cv2
+import os
+
+from pycocotools.coco import COCO
+from tqdm import tqdm
 
 from cvat import CvatDataset
-from pycocotools.coco import COCO
+from utils import coco_cat_to_label, mask_to_polygons
 
 
 def build_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--coco-gt", type=str, required=True)
-    parser.add_argument("--cvat-in", type=str, required=True)
+    parser.add_argument("--folder", type=str, required=True)
+    parser.add_argument("--supercat", action="store_true")
     parser.add_argument("--cvat-out", type=str, required=True)
     return parser
-
-
-def check(coco_gt, cvat):
-    coco_gt_labels = coco_gt.cats.values()
-    cvat_labels = cvat.get_labels()
-    not_presented = set(coco_gt_labels).difference(cvat_labels)
-    if len(not_presented) > 0:
-        print("Labels\n{}\nnot presented in cvat but presented in coco".format(list(not_presented)))
-        print("You may encounter errors during loading markup to Cvat tool")
-        return False
-    return True
 
 
 def main(args):
     coco_gt = COCO(args.coco_gt)
     name_to_coco_id = {img["file_name"]: coco_id for coco_id, img in coco_gt.imgs.items()}
+    cat_id_to_label = {id_: coco_cat_to_label(cat, args.supercat) for id_, cat in coco_gt.cats.items()}
 
     cvat = CvatDataset()
-    cvat.load(args.cvat_in)
+    names = sorted(os.listdir(args.folder))
 
-    if not check(coco_gt, cvat):
-        cmd = input("Some errors occurred. Continue anyway? (y/n)")
-        if cmd == "n":
-            exit()
+    for name in tqdm(names):
+        ext = name.split(".")[-1]
+        assert ext.lower() in ["png", "jpg", "jpeg", "tiff"], ext
 
-    for image_id in cvat.get_image_ids():
-        name = cvat.get_name(image_id)
+        image_id = cvat.add_image()
+
         coco_id = name_to_coco_id[name]
 
         for ann in coco_gt.imgToAnns[coco_id]:
-            label = coco_gt.cats[ann["category_id"]]
+            label = cat_id_to_label[ann["category_id"]]
 
             if "bbox" in ann:
                 x, y, width, height = ann["bbox"]
@@ -51,6 +44,8 @@ def main(args):
             if "segmentation" in ann:
                 if type(ann["segmentation"]) == list:
                     polygons = ann["segmentation"]
+                    polygons = [[[polygon[i], polygon[i + 1]] for i in range(0, len(polygon), 2)]
+                                for polygon in polygons]
                 else:
                     # -- pycocotools/coco.py 263:268
                     t = coco_gt.imgs[ann['image_id']]
@@ -60,7 +55,7 @@ def main(args):
                         rle = [ann['segmentation']]
                     m = mask_utils.decode(rle)
                     # --
-                    polygons, _ = cv2.findContours(m * 255, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                    polygons = mask_to_polygons(m)
                 for polygon in polygons:
                     cvat.add_polygon(image_id, points=polygon, label=label)
 
