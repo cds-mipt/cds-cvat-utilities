@@ -6,7 +6,7 @@ from pycocotools.coco import COCO
 from tqdm import tqdm
 
 from cvat import CvatDataset
-from utils import coco_cat_to_label, mask_to_polygons
+from utils import coco_cat_to_label, mask_to_polygons, clip_point
 
 
 def build_parser():
@@ -37,14 +37,18 @@ def main(args):
         cvat_id = name_to_cvat_id[coco_id_to_name[coco_id]]
         label = cat_id_to_label[ann["category_id"]]
         conf = ann["score"]
+        W, H = coco_gt.imgs[coco_id]["width"], coco_gt.imgs[coco_id]["height"]
         if args.iou_type == "bbox":
             x, y, width, height = ann["bbox"]
-            cvat.add_box(cvat_id, x, y, x + width, y + height, label, conf=conf)
+            x1, y1 = clip_point(x, y, W, H)
+            x2, y2 = clip_point(x + width, y + height, W, H)
+            cvat.add_box(cvat_id, x1, y1, x2, y2, label, conf=conf)
         elif args.iou_type == "segm":
             rle = ann["segmentation"]
             m = mask_utils.decode(rle)
             polygons = mask_to_polygons(m)
             for polygon in polygons:
+                polygon = [clip_point(x, y, W, H) for (x, y) in polygon]
                 cvat.add_polygon(cvat_id, points=polygon, label=label, conf=conf)
 
     cvat.dump(args.cvat_out)
