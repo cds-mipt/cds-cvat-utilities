@@ -1,5 +1,7 @@
 import argparse
 import pycocotools.mask as mask_utils
+import pandas as pd
+import os
 
 from collections import defaultdict
 from pycocotools.coco import COCO
@@ -11,7 +13,6 @@ def build_parser():
     parser = argparse.ArgumentParser("Semantic segmentation metrics")
     parser.add_argument("--gt", type=str, required=True)
     parser.add_argument("--dt", type=str, required=True)
-    parser.add_argument("--mode", type=str, choices=["class", "category"], default="class")
     parser.add_argument("--folder", type=str, default="results")
     return parser
 
@@ -74,43 +75,61 @@ def semantic_segmentation_metrics(coco_gt, coco_dt):
     IoU = {cat_id: TP[cat_id] / (TP[cat_id] + FP[cat_id] + FN[cat_id]) for cat_id in coco_gt.getCatIds()}
     iIoU = {cat_id: iTP[cat_id] / (iTP[cat_id] + FP[cat_id] + iFN[cat_id]) for cat_id in coco_gt.getCatIds()}
 
-    mIoU = sum(IoU.values()) / len(IoU)
-    miIoU = sum(iIoU.values()) / len(iIoU)
-
     d = sum(T.values())
     w = {cat_id: T[cat_id] / d for cat_id in coco_gt.getCatIds()}
-    wIoU = sum(w[cat_id] * IoU[cat_id] for cat_id in coco_gt.getCatIds())
 
-    metrics = {
-        "mIoU": mIoU, "wIoU": wIoU, "miIoU": miIoU,
-        "P": P, "R": R, "IoU": IoU, "iIoU": iIoU, "w": w,
-        "TP": TP, "FP": FP, "FN": FN, "T": T, "iTP": iTP, "iFN": iFN,
-        "cats": coco_gt.cats, "cat_ids": coco_gt.getCatIds()
-    }
+    metrics = defaultdict(list)
+    for cat_id in coco_gt.getCatIds():
+        metrics["class"].append(coco_gt.cats[cat_id]["name"])
+        metrics["P"].append(P[cat_id])
+        metrics["R"].append(R[cat_id])
+        metrics["IoU"].append(IoU[cat_id])
+        metrics["iIoU"].append(iIoU[cat_id])
+        metrics["w"].append(w[cat_id])
+        metrics["TP"].append(TP[cat_id])
+        metrics["FP"].append(FP[cat_id])
+        metrics["FN"].append(FN[cat_id])
+        metrics["T"].append(T[cat_id])
+        metrics["iTP"].append(iTP[cat_id])
+        metrics["iFN"].append(iFN[cat_id])
 
-    return metrics
+    return pd.DataFrame(metrics)
 
 
-def print_report(metrics):
-    print("mIoU = {:.3f} | wIoU = {:.3f} | miIoU = {:.3f}"
-          .format(metrics["mIoU"], metrics["wIoU"], metrics["miIoU"]))
+def save_report(metrics, folder):
+    with open(os.path.join(folder, "metrics.txt"), "w") as f:
+        mIoU = metrics["IoU"].mean()
+        wIoU = (metrics["IoU"] * metrics["w"]).sum()
+        miIoU = metrics["iIoU"].mean()
+        print("mIoU = {:.3f} | wIoU = {:.3f} | miIoU = {:.3f}".format(mIoU, wIoU, miIoU), file=f)
 
-    for cat_id in metrics["cat_ids"]:
-        cat = metrics["cats"][cat_id]
-        p = metrics["P"][cat_id]
-        r = metrics["R"][cat_id]
-        iou = metrics["IoU"][cat_id]
-        iiou = metrics["iIoU"][cat_id]
-        w = metrics["w"][cat_id]
-        print("class = {:>20s} P = {:.3f} R = {:.3f} IoU = {:.3f} iIoU = {:.3f} w = {:.5f}"
-              .format(cat["name"], p, r, iou, iiou, w))
+        for i in range(len(metrics)):
+            class_ = metrics["class"].iloc[i]
+            p = metrics["P"].iloc[i]
+            r = metrics["R"].iloc[i]
+            iou = metrics["IoU"].iloc[i]
+            iiou = metrics["iIoU"].iloc[i]
+            w = metrics["w"].iloc[i]
+            print("class = {:>20s} w = {:.5f} P = {:.3f} R = {:.3f} IoU = {:.3f} iIoU = {:.3f}"
+                  .format(class_, w, p, r, iou, iiou), file=f)
+
+
+def save_csv(metrics, folder):
+    path = os.path.join(folder, "metrics.csv")
+    metrics.to_csv(path, index=False)
 
 
 def main(args):
+    os.makedirs(args.folder, exist_ok=True)
+
     coco_gt = COCO(args.gt)
     coco_dt = coco_gt.loadRes(args.dt)
+
     metrics = semantic_segmentation_metrics(coco_gt, coco_dt)
-    print_report(metrics)
+
+    save_csv(metrics, args.folder)
+
+    save_report(metrics, args.folder)
 
 
 if __name__ == "__main__":
