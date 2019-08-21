@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import pycocotools.mask as mask_utils
 
 
 def coco_cat_to_label(cat, supercategory=False):
@@ -20,3 +21,20 @@ def clip_point(x, y, W, H):
     x = np.clip(x, 0, W)
     y = np.clip(y, 0, H)
     return x, y
+
+
+def invert(rleObjs):
+    masks = mask_utils.decode(rleObjs)
+    masks = 1 - masks
+    return mask_utils.encode(masks)
+
+
+def intersect(rleObjs):
+    rleObjs = invert(rleObjs)
+    i = mask_utils.merge(rleObjs)
+    return invert([i])[0]
+
+
+def difference(a, b):
+    ib = invert([b])[0]
+    return intersect([a, ib])
