@@ -28,10 +28,7 @@ def merge_annotations(coco):
     return res
 
 
-def main(args):
-    coco_gt = COCO(args.gt)
-    coco_dt = coco_gt.loadRes(args.dt)
-
+def semantic_segmentation_metrics(coco_gt, coco_dt):
     gt = merge_annotations(coco_gt)
     dt = merge_annotations(coco_dt)
 
@@ -81,18 +78,39 @@ def main(args):
     miIoU = sum(iIoU.values()) / len(iIoU)
 
     d = sum(T.values())
-    fwIoU = sum(T[cat_id] * IoU[cat_id] / d for cat_id in coco_gt.getCatIds())
+    w = {cat_id: T[cat_id] / d for cat_id in coco_gt.getCatIds()}
+    wIoU = sum(w[cat_id] * IoU[cat_id] for cat_id in coco_gt.getCatIds())
 
-    print("mIoU = {:.3f} | f.w. IoU = {:.3f} | miIoU = {:.3f}".format(mIoU, fwIoU, miIoU))
+    metrics = {
+        "mIoU": mIoU, "wIoU": wIoU, "miIoU": miIoU,
+        "P": P, "R": R, "IoU": IoU, "iIoU": iIoU, "w": w,
+        "TP": TP, "FP": FP, "FN": FN, "T": T, "iTP": iTP, "iFN": iFN,
+        "cats": coco_gt.cats, "cat_ids": coco_gt.getCatIds()
+    }
 
-    for cat_id in coco_gt.getCatIds():
-        cat = coco_gt.cats[cat_id]
-        p = P[cat_id]
-        r = R[cat_id]
-        iou = IoU[cat_id]
-        iiou = iIoU[cat_id]
-        w = T[cat_id] / d
-        print("class = {} P = {:.3f} R = {:.3f} IoU = {:.3f} iIoU = {:.3f} w = {:.5f}".format(cat["name"], p, r, iou, iiou, w))
+    return metrics
+
+
+def print_report(metrics):
+    print("mIoU = {:.3f} | wIoU = {:.3f} | miIoU = {:.3f}"
+          .format(metrics["mIoU"], metrics["wIoU"], metrics["miIoU"]))
+
+    for cat_id in metrics["cat_ids"]:
+        cat = metrics["cats"][cat_id]
+        p = metrics["P"][cat_id]
+        r = metrics["R"][cat_id]
+        iou = metrics["IoU"][cat_id]
+        iiou = metrics["iIoU"][cat_id]
+        w = metrics["w"][cat_id]
+        print("class = {:>20s} P = {:.3f} R = {:.3f} IoU = {:.3f} iIoU = {:.3f} w = {:.5f}"
+              .format(cat["name"], p, r, iou, iiou, w))
+
+
+def main(args):
+    coco_gt = COCO(args.gt)
+    coco_dt = coco_gt.loadRes(args.dt)
+    metrics = semantic_segmentation_metrics(coco_gt, coco_dt)
+    print_report(metrics)
 
 
 if __name__ == "__main__":

@@ -2,12 +2,19 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import pandas as pd
 
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 
 
 np.warnings.filterwarnings("ignore")
+
+
+PR_CURVES = [
+    {"iouThr": 0.5, "area": "all", "class": "person", "maxDet": 10},
+    {"iouThr": 0.75, "area": "all", "class": "person", "maxDet": 10}
+]
 
 
 class Params:
@@ -35,14 +42,9 @@ class Params:
 
         self.maxDets = [1, 10, 100]
 
-        self.plot_PR = [
-            {"iou": 0.5, "area": "all", "class": "person", "maxDets": 10},
-            {"iou": 0.75, "area": "all", "class": "person", "maxDets": 10}
-        ]
-
         # остальное, как правило, нет причин менять
         self.id_to_class = {cat_id: cat["name"] for cat_id, cat in gt.cats.items()}
-        self.id_to_class[-1] = "all"
+
         self.class_to_id = {cat["name"]: cat_id for cat_id, cat in gt.cats.items()}
         self.catIds = [self.class_to_id[cls] for cls in self.classes] or list(gt.cats.keys())
         self.useCats = 1
@@ -51,6 +53,8 @@ class Params:
         self.recThrs = np.linspace(.0, 1.00, np.round((1.00 - .0) / .01) + 1, endpoint=True)
         self.areaRngLbl = list(self.areas.keys())
         self.areaRng = [self.areas[k] for k in self.areaRngLbl]
+        if not self.imgIds:
+            self.imgIds = sorted(gt.getImgIds())
 
 
 def build_parser():
@@ -62,7 +66,7 @@ def build_parser():
     return parser
 
 
-def summarize(coco_eval, f):
+def detection_metrics(coco_gt, coco_dt, params):
     def calk_cond_mean(s, area, cat_id=-1, iouThr="mean", maxDet=-1):
         p = coco_eval.params
         s = s[:, :, list(p.areaRngLbl).index(area), p.maxDets.index(maxDet)]
@@ -81,50 +85,93 @@ def summarize(coco_eval, f):
         s = coco_eval.eval['recall']
         return calk_cond_mean(s, area, cat_id, iouThr, maxDet)
 
-    mean_msg = "[area = {:6s} | IoU = {:<4} | maxDets = {:<3} ]  mAP = {:0.3f}  mAR = {:0.3f}"
-    class_msg = "[class = {:>20s} | area = {:>6s} | IoU = {:<4} | maxDets = {:<3} ]  AP = {:0.3f}  AR = {:0.3f}"
+    def pr_curve(area, cat_id, iouThr, maxDet):
+        p = coco_eval.params
+        recall = p.recThrs
+        ti = list(p.iouThrs).index(iouThr)
+        ki = list(p.catIds).index(cat_id)
+        ai = list(p.areaRngLbl).index(area)
+        di = list(p.maxDets).index(maxDet)
+        precision = coco_eval.eval['precision'][ti, :, ki, ai, di]
+        return recall, precision
 
-    stats = []
+    coco_eval = COCOeval(coco_gt, coco_dt, params.iouType)
+    coco_eval.params = params
+    coco_eval.evaluate()
+    coco_eval.accumulate()
+
+    metrics = []
     p = coco_eval.params
-    for area in p.areaRngLbl:
-        for maxDet in p.maxDets:
-            for iouThr in ["mean"] + list(p.iouThrs):
-                ap = AP(area, -1, iouThr, maxDet)
-                ar = AR(area, -1, iouThr, maxDet)
-                print(mean_msg.format(area, iouThr, maxDet, ap, ar), file=f)
-            print(file=f)
-    print(file=f)
     for cat_id in p.catIds:
         for area in p.areaRngLbl:
             for maxDet in p.maxDets:
-                for iouThr in ["mean"] + list(p.iouThrs):
+                for iouThr in p.iouThrs:
                     ap = AP(area, cat_id, iouThr, maxDet)
                     ar = AR(area, cat_id, iouThr, maxDet)
-                    print(class_msg.format(p.id_to_class[cat_id], area, iouThr, maxDet, ap, ar), file=f)
-                print(file=f)
+                    recall, precision = pr_curve(area, cat_id, iouThr, maxDet)
+                    metrics.append({
+                        "class": p.id_to_class[cat_id],
+                        "area": area,
+                        "maxDet": maxDet,
+                        "iouThr": iouThr,
+                        "AP": ap,
+                        "AR": ar,
+                        "recall": list(recall),
+                        "precision": list(precision)
+                    })
 
-    coco_eval.stats = np.array(stats)
+    return pd.DataFrame(metrics)
 
 
-def plot_PR_curve(coco_eval, folder):
-    p = coco_eval.params
-    recall = p.recThrs
-    fmt = "class={class}-iou={iou}-area={area}-maxDets={maxDets}.png"
-    for params in p.plot_PR:
-        ti = list(p.iouThrs).index(params["iou"])
-        ki = list(p.catIds).index(p.class_to_id[params["class"]])
-        ai = list(p.areaRngLbl).index(params["area"])
-        di = list(p.maxDets).index(params["maxDets"])
-        precision = coco_eval.eval['precision'][ti, :, ki, ai, di]
+def save_csv(metrics, folder):
+    path = os.path.join(folder, "metrics.csv")
+    metrics.to_csv(path, index=False)
+
+
+def save_report(metrics, folder=None):
+    f = None
+    if folder is not None:
+        f = open(os.path.join(folder, "metrics.txt"), "w")
+
+    area_list = sorted(set(metrics["area"]))
+    maxDet_list = sorted(set(metrics["maxDet"]))
+    iouThr_list = sorted(set(metrics["iouThr"]))
+
+    mean_msg = "[area = {:6s} | IoU = {:<4} | maxDets = {:<3} ]  mAP = {:0.3f}  mAR = {:0.3f}"
+    indexed = metrics.set_index(["area", "maxDet"])
+    for area in area_list:
+        for maxDet in maxDet_list:
+            sdf = indexed.loc[(area, maxDet)]
+            mAP, mAR = sdf["AP"].mean(), sdf["AR"].mean()
+            print(mean_msg.format(area, "mean", maxDet, mAP, mAR), file=f)
+
+            sdf = sdf.reset_index().set_index(["area", "maxDet", "iouThr"])
+            for iouThr in iouThr_list:
+                ssdf = sdf.loc[(area, maxDet, iouThr)]
+                mAP, mAR = ssdf["AP"].mean(), ssdf["AR"].mean()
+                print(mean_msg.format(area, iouThr, maxDet, mAP, mAR), file=f)
+            print(file=f)
+
+    if f is not None:
+        f.close()
+
+
+def save_pr_curves(metrics, pr_curves, folder):
+    indexed = metrics.set_index(["class", "iouThr", "area", "maxDet"])
+    fmt = "class={class}-iouThr={iouThr}-area={area}-maxDet={maxDet}.png"
+    for p in pr_curves:
+        idx = p["class"], p["iouThr"], p["area"], p["maxDet"]
+        recall = indexed.loc[idx, "recall"]
+        precision = indexed.loc[idx, "precision"]
         plt.clf()
-        plt.title("AP = {:.3f}".format(precision.mean()))
+        plt.title("AP = {:.3f}".format(np.mean(precision)))
         plt.plot(recall, precision)
         plt.xlim(0, 1)
         plt.ylim(0, 1)
         plt.xlabel("recall")
         plt.ylabel("precision")
         plt.grid()
-        plt.savefig(os.path.join(folder, fmt.format(**params)))
+        plt.savefig(os.path.join(folder, fmt.format(**p)))
 
 
 def main(args):
@@ -134,19 +181,12 @@ def main(args):
     coco_dt = coco_gt.loadRes(args.dt)
 
     params = Params(coco_gt, iouType=args.iou_type)
-    if not params.imgIds:
-        params.imgIds = sorted(coco_gt.getImgIds())
-    if not params.catIds:
-        params.catIds = sorted(coco_gt.getCatIds())
+    metrics = detection_metrics(coco_gt, coco_dt, params)
 
-    coco_eval = COCOeval(coco_gt, coco_dt, args.iou_type)
-    coco_eval.params = params
-    coco_eval.evaluate()
-    coco_eval.accumulate()
+    save_csv(metrics, args.folder)
 
-    with open(os.path.join(args.folder, "metrics.txt"), "w") as f:
-        summarize(coco_eval, f)
-    plot_PR_curve(coco_eval, args.folder)
+    save_report(metrics, args.folder)
+    save_pr_curves(metrics, PR_CURVES, args.folder)
 
 
 if __name__ == "__main__":
