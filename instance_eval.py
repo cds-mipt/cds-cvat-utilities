@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import pandas as pd
+import json
 
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
@@ -12,8 +13,8 @@ np.warnings.filterwarnings("ignore")
 
 
 PR_CURVES = [
-    {"iouThr": 0.5, "area": "all", "class": "person", "maxDet": 10},
-    {"iouThr": 0.75, "area": "all", "class": "person", "maxDet": 10}
+    # {"iouThr": 0.5, "area": "all", "class": "person", "maxDet": 10},
+    # {"iouThr": 0.75, "area": "all", "class": "person", "maxDet": 10}
 ]
 
 
@@ -62,6 +63,7 @@ def build_parser():
     parser.add_argument("--gt", type=str, required=True)
     parser.add_argument("--dt", type=str, required=True)
     parser.add_argument("--iou-type", type=str, default="segm", choices=["bbox", "segm"])
+    parser.add_argument("--score-thr", type=float, default=0.)
     parser.add_argument("--folder", type=str, default="results")
     return parser
 
@@ -174,11 +176,22 @@ def save_pr_curves(metrics, pr_curves, folder):
         plt.savefig(os.path.join(folder, fmt.format(**p)))
 
 
+def score_filter(dt_json, args):
+    dt_json_new = []
+    for ann in dt_json:
+        if ann["score"] >= args.score_thr:
+            dt_json_new.append(ann)
+    return dt_json_new
+
+
 def main(args):
     os.makedirs(args.folder, exist_ok=True)
 
     coco_gt = COCO(args.gt)
-    coco_dt = coco_gt.loadRes(args.dt)
+    with open(args.dt, "r") as f:
+        dt_json = json.load(f)
+    dt_json = score_filter(dt_json, args)
+    coco_dt = coco_gt.loadRes(dt_json)
 
     params = Params(coco_gt, iouType=args.iou_type)
     metrics = detection_metrics(coco_gt, coco_dt, params)
