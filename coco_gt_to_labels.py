@@ -6,11 +6,15 @@ from utils import coco_cat_to_label
 
 
 def build_parser():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--coco-gt", type=str, required=True)
-    parser.add_argument("--conf", action="store_true")
-    parser.add_argument("--supercat", action="store_true")
-    parser.add_argument("--labels-out", type=str, required=True)
+    parser = argparse.ArgumentParser("Extract labels from COCO annotations")
+    parser.add_argument("--coco-gt", type=str, required=True,
+                        help="Ground truth in COCO .json format")
+    parser.add_argument("--conf", action="store_true",
+                        help="Add confidence attribute to labels")
+    parser.add_argument("--supercat", action="store_true",
+                        help="Add supercategory to label name")
+    parser.add_argument("--labels-out", type=str, required=True,
+                        help="Output txt file with space sep labels")
     return parser
 
 

@@ -60,11 +60,16 @@ class Params:
 
 def build_parser():
     parser = argparse.ArgumentParser("Instance segmentation and object detection metrics")
-    parser.add_argument("--gt", type=str, required=True)
-    parser.add_argument("--dt", type=str, required=True)
-    parser.add_argument("--iou-type", type=str, default="segm", choices=["bbox", "segm"])
-    parser.add_argument("--score-thr", type=float, default=0.)
-    parser.add_argument("--folder", type=str, default="results")
+    parser.add_argument("--gt", type=str, required=True,
+                        help="Ground truth in COCO .json format")
+    parser.add_argument("--dt", type=str, required=True,
+                        help="Predictions in COCO .json format")
+    parser.add_argument("--iou-type", type=str, default="segm", choices=["bbox", "segm"],
+                        help="Detection/segmentation metrics")
+    parser.add_argument("--score-thr", type=float, default=0.,
+                        help="Filter predictions by score")
+    parser.add_argument("--folder", type=str, default="results",
+                        help="Place evaluation results here")
     return parser
 
 

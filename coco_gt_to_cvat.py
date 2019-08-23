@@ -10,11 +10,15 @@ from utils import coco_cat_to_label, mask_to_polygons
 
 
 def build_parser():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--coco-gt", type=str, required=True)
-    parser.add_argument("--folder", type=str, required=True)
-    parser.add_argument("--supercat", action="store_true")
-    parser.add_argument("--cvat-out", type=str, required=True)
+    parser = argparse.ArgumentParser("Convert COCO annotations to Cvat")
+    parser.add_argument("--coco-gt", type=str, required=True,
+                        help="Ground truth in COCO .json format")
+    parser.add_argument("--folder", type=str, required=True,
+                        help="Root folder of ground truth file")
+    parser.add_argument("--supercat", action="store_true",
+                        help="Add supercategory to label name")
+    parser.add_argument("--cvat-out", type=str, required=True,
+                        help="Output .xml file")
     return parser
 
 

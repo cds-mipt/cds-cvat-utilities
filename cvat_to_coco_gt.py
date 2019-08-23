@@ -6,11 +6,15 @@ from cvat import CvatDataset
 
 
 def build_parser():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--cvat", type=str, required=True)
-    parser.add_argument("--coco-in", type=str, required=False, default=None)
-    parser.add_argument("--coco-out", type=str, required=True)
-    parser.add_argument("--fmt", action="store_true")
+    parser = argparse.ArgumentParser("Convert Cvat annotations to COCO ground truth")
+    parser.add_argument("--cvat", type=str, required=True,
+                        help="Cvat annotations")
+    parser.add_argument("--coco-in", type=str, required=False, default=None,
+                        help="Ground truth in COCO .json format")
+    parser.add_argument("--coco-out", type=str, required=True,
+                        help="Output file")
+    parser.add_argument("--fmt", action="store_true",
+                        help="Easy readable formatting")
     return parser
 
 

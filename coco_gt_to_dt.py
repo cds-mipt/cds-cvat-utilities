@@ -7,11 +7,15 @@ from tqdm import tqdm
 
 
 def build_parser():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--coco-gt", type=str, required=True)
-    parser.add_argument("--coco-dt", type=str, required=True)
-    parser.add_argument("--iou-type", type=str, choices=["segm", "bbox"], default="segm")
-    parser.add_argument("--fmt", action="store_true")
+    parser = argparse.ArgumentParser("Convert COCO annotations to predictions")
+    parser.add_argument("--coco-gt", type=str, required=True,
+                        help="Ground truth in COCO .json format")
+    parser.add_argument("--coco-dt", type=str, required=True,
+                        help="Predictions in COCO .json format")
+    parser.add_argument("--iou-type", type=str, choices=["segm", "bbox"], default="segm",
+                        help="Use polygon/bbox in predictions")
+    parser.add_argument("--fmt", action="store_true",
+                        help="Easy readable formatting")
     return parser
 
 

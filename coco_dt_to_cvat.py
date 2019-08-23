@@ -10,13 +10,21 @@ from utils import coco_cat_to_label, mask_to_polygons, clip_point
 
 
 def build_parser():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--coco-gt", type=str, required=True)
-    parser.add_argument("--coco-dt", type=str, required=True)
-    parser.add_argument("--folder", type=str, required=True)
-    parser.add_argument("--supercat", action="store_true")
-    parser.add_argument("--iou-type", type=str, choices=["segm", "bbox"], default="segm")
-    parser.add_argument("--cvat-out", type=str, required=True)
+    parser = argparse.ArgumentParser("Convert predictions in COCO format to Cvat")
+    parser.add_argument("--coco-gt", type=str, required=True,
+                        help="Ground truth in COCO .json format")
+    parser.add_argument("--coco-dt", type=str, required=True,
+                        help="Predictions in COCO .json format")
+    parser.add_argument("--folder", type=str, required=True,
+                        help="Root folder of ground truth file")
+    parser.add_argument("--supercat", action="store_true",
+                        help="Add supercategory to label name")
+    parser.add_argument("--iou-type", type=str, choices=["segm", "bbox"], default="segm",
+                        help="Use segmentation/bbox from predictions")
+    parser.add_argument("--max-det", type=int, default=-1,
+                        help="Max detections per image * class")
+    parser.add_argument("--cvat-out", type=str, required=True,
+                        help="Output .xml file")
     return parser
 
 
@@ -35,6 +43,8 @@ def main(args):
     for ann in tqdm(coco_dt.anns.values()):
         coco_id = ann["image_id"]
         cvat_id = name_to_cvat_id[coco_id_to_name[coco_id]]
+        if len(cvat.get_polygons(cvat_id)) > args.max_det:
+            continue
         label = cat_id_to_label[ann["category_id"]]
         conf = ann["score"]
         W, H = coco_gt.imgs[coco_id]["width"], coco_gt.imgs[coco_id]["height"]

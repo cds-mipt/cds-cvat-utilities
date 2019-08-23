@@ -11,9 +11,12 @@ from utils import difference
 
 def build_parser():
     parser = argparse.ArgumentParser("Semantic segmentation metrics")
-    parser.add_argument("--gt", type=str, required=True)
-    parser.add_argument("--dt", type=str, required=True)
-    parser.add_argument("--folder", type=str, default="results")
+    parser.add_argument("--gt", type=str, required=True,
+                        help="Ground truth in COCO .json format")
+    parser.add_argument("--dt", type=str, required=True,
+                        help="Predictions in COCO .json format")
+    parser.add_argument("--folder", type=str, default="results",
+                        help="Place evaluation results here")
     return parser
 
 
