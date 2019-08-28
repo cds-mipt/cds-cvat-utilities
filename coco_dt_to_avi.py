@@ -44,7 +44,7 @@ def main(args):
         (width, height)
     )
 
-    for image_path in tqdm(paths[:10]):
+    for image_path in tqdm(paths):
         image_id = path_to_image_id[image_path]
         image_info = coco_dt.imgs[image_id]
         image_name = image_info["file_name"]
