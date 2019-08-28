@@ -21,8 +21,6 @@ def build_parser():
                         help="Add supercategory to label name")
     parser.add_argument("--iou-type", type=str, choices=["segm", "bbox"], default="segm",
                         help="Use segmentation/bbox from predictions")
-    parser.add_argument("--max-det", type=int, default=-1,
-                        help="Max detections per image * class")
     parser.add_argument("--cvat-out", type=str, required=True,
                         help="Output .xml file")
     return parser
@@ -43,8 +41,6 @@ def main(args):
     for ann in tqdm(coco_dt.anns.values()):
         coco_id = ann["image_id"]
         cvat_id = name_to_cvat_id[coco_id_to_name[coco_id]]
-        if len(cvat.get_polygons(cvat_id)) > args.max_det:
-            continue
         label = cat_id_to_label[ann["category_id"]]
         conf = ann["score"]
         W, H = coco_gt.imgs[coco_id]["width"], coco_gt.imgs[coco_id]["height"]

@@ -12,7 +12,7 @@ def coco_cat_to_label(cat, supercategory=False):
 
 
 def mask_to_polygons(m):
-    polygons, _ = cv2.findContours(m * 255, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    polygons, _ = cv2.findContours(m * 255, cv2.RETR_TREE, cv2.CHAIN_APPROX_TC89_KCOS)
     polygons = [[point[0].tolist() for point in polygon] for polygon in polygons]
     return polygons
 
