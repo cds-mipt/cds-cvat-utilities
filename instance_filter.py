@@ -1,5 +1,6 @@
 import argparse
 import json
+import pycocotools.mask as mask_utils
 
 from collections import defaultdict
 
@@ -10,6 +11,10 @@ def build_parser():
     parser.add_argument("--md-image", type=int, default=None)
     parser.add_argument("--md-class", type=int, default=None)
     parser.add_argument("--score-thr", type=float, default=0.0)
+    parser.add_argument("--dead-zone", type=str, default=None)
+    parser.add_argument("--dz-thr", type=float, default=1.0)
+    parser.add_argument("--width", type=int, default=None)
+    parser.add_argument("--height", type=int, default=None)
     parser.add_argument("--coco-out", type=str, required=True)
     return parser
 
@@ -55,6 +60,29 @@ def group(coco_dt):
     return grouped
 
 
+def load_rle(filename):
+    with open(filename, "r") as f:
+        width, height = map(int, f.readline().split(","))
+        polygons = [[float(p) for point in line.strip().split(";") for p in point.split(",")]
+                    for line in f]
+    rles = mask_utils.frPyObjects(polygons, height, width)
+    rle = mask_utils.merge(rles)
+    return rle
+
+
+def dead_zones(grouped, rle, t):
+    for image_id, image in grouped.items():
+        for category_id, anns in image.items():
+            anns_new = []
+            for ann in anns:
+                segm = ann["segmentation"]
+                iou = mask_utils.iou([segm], [rle], [False])[0, 0]
+                if iou < t:
+                    anns_new.append(ann)
+            grouped[image_id][category_id] = anns_new
+    return grouped
+
+
 def ungroup(grouped):
     coco_dt = []
     for image_id, image in grouped.items():
@@ -76,6 +104,9 @@ def main(args):
         grouped = max_dets_per_image(grouped, args.md_image)
     if args.score_thr:
         grouped = score_threshold(grouped, args.score_thr)
+    if args.dead_zone:
+        rle = load_rle(args.dead_zone)
+        grouped = dead_zones(grouped, rle, args.dz_thr)
 
     coco_dt = ungroup(grouped)
 
