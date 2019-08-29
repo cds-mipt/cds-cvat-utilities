@@ -11,8 +11,9 @@ def coco_cat_to_label(cat, supercategory=False):
     return label
 
 
-def mask_to_polygons(m):
+def mask_to_polygons(m, approx=0.0):
     polygons, _ = cv2.findContours(m * 255, cv2.RETR_TREE, cv2.CHAIN_APPROX_TC89_KCOS)
+    polygons = [cv2.approxPolyDP(polygon, approx, True) for polygon in polygons]
     polygons = [[point[0].tolist() for point in polygon] for polygon in polygons]
     return polygons
 

@@ -21,6 +21,8 @@ def build_parser():
                         help="Add supercategory to label name")
     parser.add_argument("--iou-type", type=str, choices=["segm", "bbox"], default="segm",
                         help="Use segmentation/bbox from predictions")
+    parser.add_argument("--approx", type=float, default=0.0,
+                        help="Mask approximation tolerance")
     parser.add_argument("--cvat-out", type=str, required=True,
                         help="Output .xml file")
     return parser
@@ -52,7 +54,7 @@ def main(args):
         elif args.iou_type == "segm":
             rle = ann["segmentation"]
             m = mask_utils.decode(rle)
-            polygons = mask_to_polygons(m)
+            polygons = mask_to_polygons(m, args.approx)
             for polygon in polygons:
                 polygon = [clip_point(x, y, W, H) for (x, y) in polygon]
                 cvat.add_polygon(cvat_id, points=polygon, label=label, conf=conf)
