@@ -36,7 +36,7 @@ def main(args):
                       for cat_id, label in enumerate(cvat.get_labels(), start=1)]
         name_to_coco_id = {os.path.relpath(cvat.get_name(image_id), args.discard): image_id
                            for image_id in cvat.get_image_ids()}
-    label_to_cat_id = {coco_cat_to_label(cat): cat["id"] for cat in coco_gt["categories"]}
+    label_to_cat_id = {coco_cat_to_label(cat): cat["id"] for cat in categories}
 
     images, annotations = [], []
     for image_id in cvat.get_image_ids():
