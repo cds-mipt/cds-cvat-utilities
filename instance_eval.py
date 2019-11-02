@@ -34,11 +34,16 @@ class Params:
         self.iouThrs = np.array([0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95])
 
         # площади объектов, для которых будут вычислeны метрики
+        # self.areas = {
+        #     "all": [0 ** 2, 1e5 ** 2],
+        #     "small": [0 ** 2, 32 ** 2],
+        #     "medium": [32 ** 2, 96 ** 2],
+        #     "large": [96 ** 2, 1e5 ** 2]
+        # }
         self.areas = {
             "all": [0 ** 2, 1e5 ** 2],
-            "small": [0 ** 2, 32 ** 2],
-            "medium": [32 ** 2, 96 ** 2],
-            "large": [96 ** 2, 1e5 ** 2]
+            "small": [0 ** 2, 20 ** 2],
+            "relevant": [40 ** 2, 1e5 ** 2],
         }
 
         self.maxDets = [1, 10, 100]
@@ -70,6 +75,8 @@ def build_parser():
                         help="Filter predictions by score")
     parser.add_argument("--folder", type=str, default="results",
                         help="Place evaluation results here")
+    parser.add_argument("--in-gt-only", action="store_true",
+                        help="Perform evaluation only on images in gt")
     return parser
 
 
@@ -155,7 +162,7 @@ def save_report(metrics, folder=None):
             sdf = sdf.reset_index().set_index(["area", "maxDet", "iouThr"])
             for iouThr in iouThr_list:
                 ssdf = sdf.loc[(area, maxDet, iouThr)]
-                mAP, mAR = ssdf["AP"].mean(), ssdf["AR"].mean()
+                mAP, mAR = ssdf["AP"][ssdf["AP"] > -0.5].mean(), ssdf["AR"][ssdf["AP"] > -0.5].mean()
                 print(mean_msg.format(area, iouThr, maxDet, mAP, mAR), file=f)
             print(file=f)
 
@@ -189,12 +196,23 @@ def score_filter(dt_json, args):
     return dt_json_new
 
 
+def image_filter(dt_json, img_ids):
+    dt_json_new = []
+    for det in dt_json:
+        if det["image_id"] in img_ids:
+            dt_json_new.append(det)
+    return dt_json_new
+
+
 def main(args):
     os.makedirs(args.folder, exist_ok=True)
 
     coco_gt = COCO(args.gt)
     with open(args.dt, "r") as f:
         dt_json = json.load(f)
+    if args.in_gt_only:
+        dt_json = image_filter(dt_json, coco_gt.getImgIds())
+
     dt_json = score_filter(dt_json, args)
     coco_dt = coco_gt.loadRes(dt_json)
 
