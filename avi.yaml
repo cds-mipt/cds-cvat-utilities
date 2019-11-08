@@ -1,0 +1,100 @@
+# Конфигурационный фаил для coco_dt_to_avi.py с параметрами для записи видео ролика
+# с результатами детекции, сегментации объектов, семантической сегментации
+
+# выходной .avi фаил
+OUT: /home/ivb/Deploy/cds-mmdetection/work_dirs/faster_rcnn_r50_fpn_1x_rtsd_10+1_8_22/traffic_signs.avi
+
+# директория с картинками
+IMAGES: /datasets/NKBVS_data/converted/2019-01-31-15-53-26_kia_velo_gps_time_stereo_left/
+
+# как определить порядок изображений:
+#  name - по имени относительно IMAGES в лексикографическом порядке
+#  id - по одноименному полю COCO data фаила (тогда это соответствие должно быть одинаковым для всех фаилов)
+#  <path> - фаил-список имен в нужном порядке относительно IMAGES
+ORDER: name
+
+# число кадров в секунду
+FPS: 10
+
+# сколько первых изображений обработать, -1 - все
+# полезно при отладке и подборе параметров визуализации
+LIMIT: -1
+
+# выходной ролик состоит из окон
+WINDOWS:
+  # имя окна, произвольное
+  INSTANCES:
+    # верхний левый угол окна
+    POSITION: [0, 0]
+
+    # выходное разрешение ролика [ширина, высота]
+    # если кадр имеет другой размер, то он будет отмасштабирован
+    RESOLUTION: [2048, 1280]
+
+    # список аннотаций для отображения
+    ANNOTATIONS: [TRAFFIC_SIGNS, INSTANCE_SEGMENTATION]
+
+  SEGMENTATION:
+    POSITION: [2048, 0]
+    RESOLUTION: [2048, 1280]
+    ANNOTATIONS: [SEMANTIC_SEGMENTATION]
+
+  # порядок отрисовки окон, полезно при наложении окон
+  ORDER: [INSTANCES, SEGMENTATION]
+
+ANNOTATIONS:
+  TRAFFIC_SIGNS:
+    # фаил в COCO-data формате с полями "images" и "categories"
+    GT: /home/ivb/datasets/converted/2019-01-31-15-53-26_kia_velo_gps_time_stereo_left_10+1.json
+
+    # фаил в COCO-result формате с полями "bbox" или "segmentation", в зависимости от MODE
+    DT: /home/ivb/Deploy/cds-mmdetection/work_dirs/faster_rcnn_r50_fpn_1x_rtsd_10+1_8_22/nkbvs_2019-01-31-15-53-26_kia_velo_gps_time_stereo_left_traffic_signs_filtered.bbox.json
+
+    # режим отрисовки - поле из COCO-result; задача; параметры отрисовки:
+    #  bbox - bbox; детекция объектов; BORDER
+    #  isegm - segmentation; сегментация объектов; BORDER, TRANSPARENCY
+    #  ssegm - segmentation; семантическая сегментация; TRANSPARENCY
+    MODE: bbox
+
+    # цвета будут выделены автоматически для всех классов
+    COLORS: auto
+
+    # размер шрифта
+    FONTSCALE: 1
+
+    # ширина шрифта
+    THICKNESS: 2
+
+    # ширина границы линий
+    BORDER: 2
+
+  SEMANTIC_SEGMENTATION:
+    GT: /home/ivb/datasets/converted/2019-01-31-15-53-26_kia_velo_gps_time_stereo_left_semseg_relabled.json
+    DT: /home/ivb/Deploy/cds-mmdetection/results/htc_x101_64x4d_fpn/epoch_2_nkbvs_semsegm_dz_relabled_merged_noempty_filled.semsegm.json
+    MODE: ssegm
+
+    # цвета можно задать вручную как H-компоненту из HSV [0, 180);
+    # те классы, что не указаны, будут проигнорированы
+    COLORS:
+      sky: 90
+      road: 60
+      borders: 30
+      traffic light: 150
+      vehicle: 120
+      person: 0
+
+    FONTSCALE: 1
+    THICKNESS: 2
+    TRANSPARENCY: 0.7  # прозрачность заполнения
+
+  INSTANCE_SEGMENTATION:
+    GT: /home/ivb/datasets/converted/2019-01-31-15-53-26_kia_velo_gps_time_stereo_left.json
+    DT: /home/ivb/Deploy/cds-mmdetection/results/htc_x101_64x4d_fpn/epoch_2_nkbvs_filtered.segm.json
+    POSITION: [2048, 0]
+    RESOLUTION: [2048, 1280]
+    MODE: isegm
+    COLORS: auto
+    FONTSCALE: 1
+    THICKNESS: 2
+    BORDER: 1
+    TRANSPARENCY: 0.7
