@@ -1,6 +1,7 @@
 import xml.etree.ElementTree as xml
 import xml.etree.cElementTree as ET
 import os
+import copy
 
 
 class CvatDataset:
@@ -28,17 +29,20 @@ class CvatDataset:
                 box.attrib["occluded"] = bool(int(box.attrib["occluded"]))
                 for k in ["xtl", "ytl", "xbr", "ybr"]:
                     box.attrib[k] = float(box.attrib[k])
-                conf = None
                 conf_attr = box.find("attribute[@name='conf']")
                 if conf_attr is not None:
-                    #conf = float(conf_attr.text)
                     conf = str(conf_attr.text)
+                list_of_keys = ['xtl', 'ytl', 'xbr', 'ybr', 'label', 'occluded']
+                copy_dict = copy.deepcopy(box.attrib)                
+                for key in box.attrib.keys():
+                    if not(key in list_of_keys):
+                        copy_dict.pop(key,0)
+                box.attrib = copy.deepcopy(copy_dict)
                 self.add_box(image_id, **box.attrib,  conf=conf)
 
             for polygon in image.iter("polygon"):
                 polygon.attrib["occluded"] = bool(int(polygon.attrib["occluded"]))
                 conf_attr = polygon.find("attribute[@name='conf']")
-                conf = None
                 if conf_attr is not None:
                     conf = str(conf_attr.text)
                 points = list(map(lambda x: list(map(float, x.split(","))),
