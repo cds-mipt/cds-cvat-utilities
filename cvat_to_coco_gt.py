@@ -64,7 +64,8 @@ def main(args):
                 "segmentation": [[x, y, x + width, y, x + width, y + height, x, y + height]],
                 "area": width * height,
                 "bbox": [x, y, width, height],
-                "iscrowd": 0
+                "iscrowd": 0,
+                "conf":box["conf"]
             }
             annotations.append(annotation)
 
@@ -79,7 +80,8 @@ def main(args):
                 "segmentation": [points.flatten().tolist()],
                 "area": width * height,
                 "bbox": [x, y, width, height],
-                "iscrowd": 0
+                "iscrowd": 0,
+                "conf":box["conf"]
             }
             annotations.append(annotation)
 
