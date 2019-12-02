@@ -81,7 +81,7 @@ def main(args):
                 "area": width * height,
                 "bbox": [x, y, width, height],
                 "iscrowd": 0,
-                "conf":box["conf"]
+                "conf":polygon["conf"]
             }
             annotations.append(annotation)
 

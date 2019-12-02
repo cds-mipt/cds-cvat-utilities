@@ -10,7 +10,7 @@ import json
 import os
 
 labels = {} #global
-with open("instances_val2017.json", "r") as file:
+with open("99_Taganrog-Day-Night_cropped_traffic_lights.json", "r") as file:
     data = json.load(file)
 
 def create_header(im_num):
@@ -70,9 +70,13 @@ def points_layout(img, hash):
                 points += ";"
                 cnt += 2
             label_id = annot["category_id"]
+            conf = str(annot['conf'])
 
-            ET.SubElement(img, "points", {"label": labels[label_id], "occluded":"0",\
-                                  "points":points[:-1]})
+            polygon_sub_element = ET.SubElement(img, "polygon", {"label": labels[label_id], "occluded":"0",\
+                                  "points":points[:-1], 'conf':conf})
+            attribute_polygon_sub_element = ET.SubElement(polygon_sub_element, 'attribute', {})
+            attribute_polygon_sub_element.text = str(conf)
+            attribute_polygon_sub_element.set('name','conf')
             if (len(box_array) != 0):
                 xtl = box_array[0]
                 ytl = box_array[1]
@@ -81,10 +85,12 @@ def points_layout(img, hash):
 
                 xbr = round(xtl+lenght, 2)
                 ybr = round(ytl+height, 2)
-                elem = ET.SubElement(img, "box", {"label": labels[label_id], "occluded":"0",\
+                box_sub_element = ET.SubElement(img, "box", {"label": labels[label_id], "occluded":"0",\
                                "xtl":str(xtl), "ytl":str(ytl),\
                                "xbr":str(xbr), "ybr":str(ybr)})
-                elem.text = ""
+                attribute_box_sub_element = ET.SubElement(box_sub_element, 'attribute', {})
+                attribute_box_sub_element.text = str(conf)
+                attribute_box_sub_element.set('name','conf')
 
 
 
@@ -97,31 +103,29 @@ def f_name(image):
     return image["file_name"]
 
 def main():
-    xml_f = open("cvatfile(from_COCO).xml", "wb")
+    xml_f = open("99_Taganrog-Day-Night_cropped_traffic_lights.xml", "wb")
 
     im_number = len(data["images"])
     create_labels()
     root = create_header(im_number)
 
     file_list = list()
-    directory = "C:/Users/Public/DataSets/test_set(180photos)/"
+    directory = "/home/solomentsev_yaroslav/Jupyter_Notebook/datasets/Cropped_traffic_lights_TAGANROG/images"
     for filename in os.listdir(directory):
         file_list.append(filename)
 
     data["images"].sort(key=f_name)
 
     tmp = 0
-
     for image in data["images"]:
         if (image["file_name"] in file_list):
             add_image(image, root, image["width"], image["height"], image["file_name"], image["id"], tmp)
             create_labels()
             tmp += 1
 
-
     tree = ET.ElementTree(root)
     tree.write(xml_f)
-
+    
     print(root[2].attrib)
 
 if __name__ == "__main__":
