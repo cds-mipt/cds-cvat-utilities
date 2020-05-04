@@ -10,7 +10,7 @@ import json
 import os
 
 labels = {} #global
-with open("mappilary_part_0.json", "r") as file:
+with open("mappilary_632.json", "r") as file:
     data = json.load(file)
 
 def create_header(im_num):
@@ -76,9 +76,9 @@ def points_layout(img, hash):
 
                 polygon_sub_element = ET.SubElement(img, "polygon", {"label": labels[label_id], "occluded":"0",\
                                                     "points":points[:-1], 'conf':conf})
-                attribute_polygon_sub_element = ET.SubElement(polygon_sub_element, 'attribute', {})
-                attribute_polygon_sub_element.text = str(conf)
-                attribute_polygon_sub_element.set('name','conf')
+                #attribute_polygon_sub_element = ET.SubElement(polygon_sub_element, 'attribute', {})
+                #attribute_polygon_sub_element.text = str(conf)
+                #attribute_polygon_sub_element.set('name','conf')
             if box_array != None:
                 xtl = box_array[0]
                 ytl = box_array[1]
@@ -105,7 +105,7 @@ def f_name(image):
     return image["file_name"]
 
 def main():
-    xml_f = open("mappilary_part_0.xml", "wb")
+    xml_f = open("mappilary_632.xml", "wb")
 
     im_number = len(data["images"])
     create_labels()
